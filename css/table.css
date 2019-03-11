@@ -1,0 +1,40 @@
+table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+table th, table td {
+	padding: 8px;
+	text-align: left;
+	vertical-align: top;
+}
+
+table th {
+	white-space: nowrap;
+}
+
+@media (max-width:600px) {
+
+table th:not(:first-child) {
+	display: none;
+}
+
+table th:first-child, table td {
+	display: block;
+}
+
+table td:not(:first-child) {
+	position: relative;
+	padding-left: 120px;
+}
+
+table td:not(:first-child)::before {
+	content: attr(data-col);
+	position: absolute;
+	left: 8px;
+	width: 112px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+}
