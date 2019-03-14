@@ -86,7 +86,7 @@ $page->add_body( function( string $quota ) {
 			<label for="recipients">recipients</label>
 		</div>
 		<div class="w3-section">
-			<textarea id="message" class="w3-input" name="message" required="required"></textarea>
+			<textarea id="message" class="w3-input" name="message" required="required" style="resize: vertical;"></textarea>
 			<label for="message">message</label>
 			<span class="w3-right">
 				<span id="characters"></span>
