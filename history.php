@@ -125,6 +125,13 @@ $page->add_body( function( array $history, string $cnav ) {
 				case Mycosmos::COL_RECIPIENT:
 					echo sprintf( '<a href="tel:%s">%s</a>', $row[$col], $row[$col] ) . "\n";
 					break;
+				case Mycosmos::COL_TIME:
+					if ( $row[$col] === '' )
+						echo '<span class="fas fa-question"></span>' . "\n";
+					else
+						foreach ( explode( ' ', $row[$col] ) as $dt )
+							echo sprintf( '<span style="white-space: nowrap;">%s</span>', $dt ) . "\n";
+					break;
 				default:
 					echo $row[$col];
 					break;
