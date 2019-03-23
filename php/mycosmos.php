@@ -9,22 +9,31 @@ function curl_safe_init( string $url = '' ) {
 
 function curl_safe_setopt( $ch, int $option, $value ) {
 	$ret = curl_setopt( $ch, $option, $value );
-	if ( $ret === FALSE )
-		exit( 'curl_setopt: ' . $option );
+	if ( $ret === FALSE ) {
+		$errno = curl_errno( $ch );
+		curl_close( $ch );
+		exit( 'curl_setopt ' . $option . ': ' . curl_strerror( $errno ) );
+	}
 	return $ret;
 }
 
 function curl_safe_exec( $ch ) {
 	$ret = curl_exec( $ch );
-	if ( $ret === FALSE )
-		exit( 'curl_exec' );
+	if ( $ret === FALSE ) {
+		$errno = curl_errno( $ch );
+		curl_close( $ch );
+		exit( 'curl_exec: ' . curl_strerror( $errno ) );
+	}
 	return $ret;
 }
 
 function curl_safe_getinfo( $ch, int $opt = 0 ) {
 	$ret = curl_getinfo( $ch, $opt );
-	if ( $opt === 0 && $ret === FALSE )
-		exit( 'curl_getinfo' );
+	if ( $opt === 0 && $ret === FALSE ) {
+		$errno = curl_errno( $ch );
+		curl_close( $ch );
+		exit( 'curl_getinfo ' . $opt . ': ' . curl_strerror( $errno ) );
+	}
 	return $ret;
 }
 
