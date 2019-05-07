@@ -18,6 +18,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 		case 'send':
 			if ( is_null( $mycosmos ) )
 				failure( 'send: login required' );
+			$mycosmos->login();
 			$recipients = request_var( 'recipients' );
 			$message = request_var( 'message' );
 			$save = request_bool( 'save' );
@@ -73,6 +74,8 @@ $( '#clear' ).click( function() {
 } );
 
 } else {
+
+$mycosmos->login();
 
 $quota = $mycosmos->get_quota();
 

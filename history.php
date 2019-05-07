@@ -5,6 +5,8 @@ require_once( 'php/core.php' );
 if ( is_null( $mycosmos ) )
 	failure( 'history: login required' );
 
+$mycosmos->login();
+
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 	$task = request_var( 'task' );
 	switch ( $task ) {

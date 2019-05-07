@@ -95,7 +95,6 @@ require_once( SITE_DIR . 'php/mycosmos-session.php' );
 
 try {
 	$mycosmos = new MycosmosSession();
-	$mycosmos->login();
 } catch ( MycosmosSessionException $e ) {
 	$mycosmos = NULL;
 }
