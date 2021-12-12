@@ -1,8 +1,7 @@
 <?php
 
-require_once( 'php/core.php' );
+require_once( 'php/index.php' );
 
-if ( !is_null( $mycosmos ) )
-	$mycosmos->logout();
+$mycosmos->do_logout();
 
 redirect();

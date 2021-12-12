@@ -1,81 +1,63 @@
 <?php
 
-require_once( 'php/core.php' );
-
-if ( is_null( $mycosmos ) )
-	failure( 'history: login required' );
-
-$mycosmos->login();
+require_once( 'php/index.php' );
 
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
-	$task = request_var( 'task' );
-	switch ( $task ) {
-		case 'cache-clear':
-			session_start();
-			if ( array_key_exists( 'history', $_SESSION ) )
-				unset( $_SESSION['history'] );
-			session_write_close();
-			success( [
-				'redirect' => site_href(),
-			] );
-		case 'cache-refresh':
-			session_start();
-			if ( array_key_exists( 'history', $_SESSION ) )
-				unset( $_SESSION['history'] );
-			session_write_close();
-			$mycosmos->history();
-			success( [
-				'redirect' => site_href( 'history.php' ),
-			] );
-		default:
-			failure( 'task not valid' );
+	$task = MCR::get_str( 'task' );
+	if ( $task === 'cache-clear' ) {
+		$mycosmos->set_value( 'history' );
+		success( [
+			'redirect' => site_href(),
+		] );
 	}
+	if ( $task === 'cache-refresh' ) {
+		session_start();
+		$mycosmos->set_value( 'history' );
+		$mycosmos->history();
+		success( [
+			'redirect' => NULL,
+		] );
+	}
+	exit( 'task' );
 }
+
+if ( !$mycosmos->has_login() )
+	mycosmos::page_login();
+
+$page = new page();
 
 $history = $mycosmos->history();
 
-if ( array_key_exists( 'nav', $_GET ) ) {
-	$cnav = $_GET['nav'];
+$cnav = MCR::get_str( 'nav', TRUE );
+if ( !is_null( $cnav ) ) {
 	if ( !array_key_exists( $cnav, $history['navs'] ) )
-		failure( 'history: nav not valid' );
+		exit( 'nav' );
 } elseif ( !empty( $history['navs'] ) ) {
-	$cnav = array_keys( $history['navs'] )[0];
+	$cnav = array_key_first( $history['navs'] );
 } else {
-	failure( 'history: empty' );
+	exit( 'history' );
 }
 
 $years = [];
 foreach ( array_keys( $history['navs'] ) as $nav ) {
 	$year = intval( substr( $nav, 0, 4 ) );
-	if ( array_key_exists( $year, $years ) )
-		$years[$year][] = $nav;
-	else
-		$years[$year] = [ $nav ];
+	if ( !array_key_exists( $year, $years ) )
+		$years[$year] = [];
+	$years[$year][] = $nav;
 }
 
 $page = new page( 'history' );
+$page->add_action( 'head_tag', [ 'page', 'echo_style_tag' ], site_href( 'table.css' ) );
 
-$page->add_css( 'css/table.css' );
-
-$page->add_js( 'js/link.js' );
-
-$page->add_body( function() {
-?>
-<div class="w3-panel w3-content">
-	<h3>cache</h3>
-	<a class="link-ajax w3-button w3-round w3-theme" href="?task=cache-refresh">
-		<span class="fas fa-fw fa-sync"></span>
-		<span>refresh</span>
-	</a>
-	<a class="link-ajax w3-button w3-round w3-theme" href="?task=cache-clear">
-		<span class="fas fa-fw fa-ban"></span>
-		<span>clear</span>
-	</a>
-</div>
-<?php
+$page->add_action( 'body_tag', function(): void {
+	echo '<div class="flex-row flex-align-center">' . "\n";
+	echo '<h3 class="leaf">cache</h3>' . "\n";
+	page::echo_button( '?task=cache-refresh', 'refresh', 'fas fa-fw fa-sync', 'ajax-link leaf w3-round' );
+	page::echo_button( '?task=cache-clear', 'clear', 'fas fa-fw fa-ban', 'ajax-link leaf w3-round' );
+	echo '</div>' . "\n";
 } );
 
-$page->add_body( function( array $years, string $cnav ) {
+$page->add_action( 'body_tag', function( array $years, string $cnav ): void {
 	$cyear = intval( substr( $cnav, 0, 4 ) );
 	echo '<div class="w3-bar w3-section w3-theme">' . "\n";
 	foreach ( $years as $year => $navs ) {
@@ -94,7 +76,7 @@ $page->add_body( function( array $years, string $cnav ) {
 	echo '</div>' . "\n";
 }, $years, $cnav );
 
-$page->add_body( function( array $history, string $cnav ) {
+$page->add_action( 'body_tag', function( array $history, string $cnav ): void {
 	$cols = [
 		Mycosmos::COL_CONTENT,
 		Mycosmos::COL_RECIPIENT,

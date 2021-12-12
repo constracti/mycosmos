@@ -1,42 +1,35 @@
 <?php
 
-require_once( SITE_DIR . 'php/mycosmos.php' );
+if ( !class_exists( 'Mycosmos' ) )
+	require_once( __DIR__ . '/mycosmos.php' );
 
-class MycosmosSessionException extends Exception {}
-
-class MycosmosSession extends Mycosmos {
+final class MycosmosSession extends Mycosmos {
 
 	public function __construct() {
-		session_start();
-		if ( !array_key_exists( 'username', $_SESSION ) )
-			throw new MycosmosSessionException();
-		$username = $_SESSION['username'];
-		if ( !array_key_exists( 'password', $_SESSION ) )
-			throw new MycosmosSessionException();
-		$password = $_SESSION['password'];
-		session_write_close();
+		$username = $this->get_value( 'username' );
+		$password = $this->get_value( 'password' );
 		parent::__construct( $username, $password );
 	}
 
-	public function logout() {
+	public function do_logout(): void {
 		session_start();
-		$_SESSION = [];
-		session_write_close();
+		session_destroy();
+		parent::do_logout();
 	}
 
-	protected function load( string $key ) {
+	public function get_value( string $key ) {
 		session_start();
-		if ( array_key_exists( $key, $_SESSION ) && is_array( $_SESSION[$key] ) )
-			$value = $_SESSION[$key];
-		else
-			$value = NULL;
-		session_write_close();
+		$value = array_key_exists( $key, $_SESSION ) ? $_SESSION[$key] : NULL;
+		session_abort();
 		return $value;
 	}
 
-	protected function save( string $key, $value ) {
+	public function set_value( string $key, $value = NULL ): void {
 		session_start();
-		$_SESSION[$key] = $value;
-		session_write_close();
+		if ( !is_null( $value ) )
+			$_SESSION[$key] = $value;
+		else
+			unset( $_SESSION[$key] );
+		session_commit();
 	}
 }

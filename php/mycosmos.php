@@ -1,23 +1,21 @@
 <?php
 
-function curl_safe_init( string $url = '' ) {
+function curl_safe_init( string|null $url = NULL ): CurlHandle {
 	$ch = curl_init( $url );
 	if ( $ch === FALSE )
 		exit( 'curl_init' );
 	return $ch;
 }
 
-function curl_safe_setopt( $ch, int $option, $value ) {
-	$ret = curl_setopt( $ch, $option, $value );
-	if ( $ret === FALSE ) {
+function curl_safe_setopt( CurlHandle $ch, int $option, $value ): void {
+	if ( curl_setopt( $ch, $option, $value ) === FALSE ) {
 		$errno = curl_errno( $ch );
 		curl_close( $ch );
 		exit( 'curl_setopt ' . $option . ': ' . curl_strerror( $errno ) );
 	}
-	return $ret;
 }
 
-function curl_safe_exec( $ch ) {
+function curl_safe_exec( CurlHandle $ch ) {
 	$ret = curl_exec( $ch );
 	if ( $ret === FALSE ) {
 		$errno = curl_errno( $ch );
@@ -27,9 +25,9 @@ function curl_safe_exec( $ch ) {
 	return $ret;
 }
 
-function curl_safe_getinfo( $ch, int $opt = 0 ) {
+function curl_safe_getinfo( CurlHandle $ch, int|null $opt = NULL ) {
 	$ret = curl_getinfo( $ch, $opt );
-	if ( $opt === 0 && $ret === FALSE ) {
+	if ( ( is_null( $opt ) || $opt === 0 ) && $ret === FALSE ) {
 		$errno = curl_errno( $ch );
 		curl_close( $ch );
 		exit( 'curl_getinfo ' . $opt . ': ' . curl_strerror( $errno ) );
@@ -54,20 +52,27 @@ abstract class Mycosmos {
 	private $password;
 	protected $cookies;
 
-	private $has_login = FALSE;
-	private $xpath = NULL;
+	public $valid;
 
-	public function __construct( string $username, string $password ) {
+	public function __construct( string|null $username, string|null $password ) {
 		$this->username = $username;
 		$this->password = $password;
-		$this->cookies = $this->load( 'cookies' );
+		$this->cookies = $this->get_value( 'cookies' );
+		$this->valid = FALSE;
+		$this->do_login();
 	}
 
-	public function logout() {}
+	public function has_login(): bool {
+		return $this->valid;
+	}
 
-	abstract protected function load( string $key );
+	public function do_logout(): void {
+		$this->valid = FALSE;
+	}
 
-	abstract protected function save( string $key, $value );
+	abstract public function get_value( string $key );
+
+	abstract public function set_value( string $key, $value = NULL ): void;
 
 	private function serialize_cookies(): string {
 		$cookies = [];
@@ -76,7 +81,7 @@ abstract class Mycosmos {
 		return implode( '; ', $cookies );
 	}
 
-	private function update_cookies( string $header ) {
+	private function update_cookies( string $header ): void {
 		if ( is_null( $this->cookies ) )
 			$this->cookies = [];
 		$lines = explode( "\n", $header );
@@ -92,19 +97,19 @@ abstract class Mycosmos {
 					unset( $this->cookies[ $name ] );
 			}
 		}
-		$this->save( 'cookies', $this->cookies );
+		$this->set_value( 'cookies', $this->cookies );
 	}
 
-	private function curl_init( string $url ) {
+	private function curl_init( string $url ): CurlHandle {
 		$ch = curl_safe_init( $url );
 		curl_safe_setopt( $ch, CURLOPT_HEADER, TRUE );
 		curl_safe_setopt( $ch, CURLOPT_RETURNTRANSFER, TRUE );
+		curl_safe_setopt( $ch, CURLOPT_SSL_VERIFYPEER, FALSE ); // TODO update certificates
 		curl_safe_setopt( $ch, CURLOPT_COOKIE, $this->serialize_cookies() );
 		return $ch;
 	}
 
-	private function curl_exec( $ch ) {
-		$this->xpath = NULL;
+	private function curl_exec( $ch ): DOMXPath {
 		$result = curl_safe_exec( $ch );
 		$code = curl_safe_getinfo( $ch, CURLINFO_HTTP_CODE );
 		if ( $code === 302 ) {
@@ -112,7 +117,7 @@ abstract class Mycosmos {
 			curl_close( $ch );
 			$this->update_cookies( $result );
 			$ch = $this->curl_init( $url );
-			return $this->curl_exec( $ch );
+			$result = curl_safe_exec( $ch );
 		}
 		curl_close( $ch );
 		$pos = mb_strpos( $result, '<!DOCTYPE html>' );
@@ -122,7 +127,7 @@ abstract class Mycosmos {
 		$doc = new DOMDocument();
 		$level = error_reporting();
 		if ( $level & E_WARNING )
-			error_reporting( $level - E_WARNING );
+			error_reporting( $level & ~E_WARNING );
 		$bool = $doc->loadHTML( $html );
 		error_reporting( $level );
 		if ( $bool === FALSE )
@@ -130,79 +135,112 @@ abstract class Mycosmos {
 		$xpath = new DOMXPath( $doc );
 		if ( is_null( $xpath ) )
 			exit( 'xpath' );
-		$this->xpath = $xpath;
 		return $xpath;
 	}
 
-	private function xpath_has_login( $xpath = NULL ): bool {
-		if ( is_null( $xpath ) )
-			$xpath = $this->xpath;
+	private static function xpath_has_login( DOMXPath $xpath ): bool {
 		return $xpath->query( '//*[@id="login-area"]' )->length !== 0;
 	}
 
-	private function xpath_get_token( $xpath = NULL ): string {
-		if ( is_null( $xpath ) )
-			$xpath = $this->xpath;
+	private static function xpath_get_token( DOMXPath $xpath ): string|null {
 		$nodelist = $xpath->query( '//input[@name="_token"]' );
 		if ( $nodelist->length !== 1 )
-			exit( 'token' );
+			return NULL;
 		return $nodelist->item( 0 )->getAttribute( 'value' );
 	}
 
-	private function xpath_get_quota( $xpath = NULL ): string {
-		if ( is_null( $xpath ) )
-			$xpath = $this->xpath;
+	private static function xpath_get_quota( DOMXPath $xpath ): string|null {
 		$nodelist = $xpath->query( '//*[@id="sms_quota"]' );
 		if ( $nodelist->length !== 1 )
-			exit( 'quota' );
+			return NULL;
 		return $nodelist->item( 0 )->nodeValue;
 	}
 
-	public function login() {
-		if ( $this->has_login )
-			return;
-		// cookies login
+	public function do_login(): bool {
+		// true
+		if ( $this->has_login() )
+			return TRUE;
+		// cookies
 		$ch = $this->curl_init( self::URL_HOME );
-		$this->curl_exec( $ch );
-		if ( $this->xpath_has_login() ) {
-			$this->has_login = TRUE;
-			return;
+		$xpath = $this->curl_exec( $ch );
+		if ( self::xpath_has_login( $xpath ) ) {
+			$this->valid = TRUE;
+			return TRUE;
 		}
-		// credentials login
-		$token = $this->xpath_get_token();
-		$ch = $this->curl_init( self::URL_HOME );
-		curl_safe_setopt( $ch, CURLOPT_CUSTOMREQUEST, 'POST' );
-		curl_safe_setopt( $ch, CURLOPT_POSTFIELDS, [
-			'_token'  => $token,
-			'_action' => 'login',
-			'_user'   => $this->username,
-			'_pass'   => $this->password,
-		] );
-		$this->curl_exec( $ch );
-		if ( $this->xpath_has_login() ) {
-			$this->has_login = TRUE;
-			return;
-		} else
-			exit( 'login' );
+		// form
+		if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
+			$task = MCR::get_str( 'task', TRUE );
+			if ( $task === 'login' ) {
+				$this->set_value( 'username', MCR::post_str( 'username' ) );
+				$this->set_value( 'password', MCR::post_str( 'password' ) );
+				success( [
+					'redirect' => NULL,
+				] );
+			}
+		}
+		// credentials
+		if ( !is_null( $this->username ) && !is_null( $this->password ) ) {
+			$token = self::xpath_get_token( $xpath );
+			$ch = $this->curl_init( self::URL_HOME );
+			curl_safe_setopt( $ch, CURLOPT_CUSTOMREQUEST, 'POST' );
+			curl_safe_setopt( $ch, CURLOPT_POSTFIELDS, [
+				'_token'  => $token,
+				'_action' => 'login',
+				'_user'   => $this->username,
+				'_pass'   => $this->password,
+			] );
+			$xpath = $this->curl_exec( $ch );
+			if ( self::xpath_has_login( $xpath ) ) {
+				$this->valid = TRUE;
+				return TRUE;
+			}
+		}
+		// false
+		return FALSE;
 	}
 
-	public function get_quota(): string {
-		$this->login();
+	public static function page_login(): void {
+		$page = new page();
+		$page->add_action( 'body_tag', function(): void {
+?>
+<form class="ajax-form leaf root flex-col w3-card w3-round w3-theme-l4" method="post" action="?task=login" autocomplete="off">
+	<label class="leaf">
+		<span>username</span>
+		<br />
+		<input type="text" class="w3-input" name="username" required="required" />
+	</label>
+	<label class="leaf">
+		<span>password</span>
+		<br />
+		<input type="password" class="w3-input" name="password" required="required" />
+	</label>
+	<div class="flex-row">
+		<button class="leaf w3-button w3-round w3-theme" type="submit">
+			<span class="fas fa-fw fa-sign-in-alt"></span>
+			<span>login</span>
+		</button>
+	</div>
+</form>
+<?php
+		} );
+		$page->html();
+	}
+
+	public function get_quota(): string|null {
+		if ( !$this->has_login() )
+			return NULL;
 		$ch = $this->curl_init( self::URL_COMPOSE );
-		$this->curl_exec( $ch );
-		return $this->xpath_get_quota();
+		$xpath = $this->curl_exec( $ch );
+		return self::xpath_get_quota( $xpath );
 	}
 
-	private function get_compose_token(): string {
+	public function send( string $recipients, string $message, bool $save ): void {
+		if ( !$this->has_login() )
+			exit( 'session' );
 		$ch = $this->curl_init( self::URL_COMPOSE );
-		$this->curl_exec( $ch );
-		return $this->xpath_get_token();
-	}
-
-	public function send( string $recipients, string $message, bool $save ) {
-		$this->login();
-		$token = $this->get_compose_token();
-		$quota_prev = $this->xpath_get_quota();
+		$xpath = $this->curl_exec( $ch );
+		$token = self::xpath_get_token( $xpath );
+		$quota_prev = self::xpath_get_quota( $xpath );
 		$ch = $this->curl_init( self::URL_SEND );
 		curl_safe_setopt( $ch, CURLOPT_CUSTOMREQUEST, 'POST' );
 		curl_safe_setopt( $ch, CURLOPT_POSTFIELDS, [
@@ -212,17 +250,18 @@ abstract class Mycosmos {
 			'_save_sms' => $save,
 			'_date'     => '', # TODO date
 		] );
-		$this->curl_exec( $ch );
-		$quota = $this->xpath_get_quota();
+		$xpath = $this->curl_exec( $ch );
+		$quota = self::xpath_get_quota( $xpath );
 		if ( $quota === $prev_quota )
 			exit( 'send' );
 	}
 
 	public function history(): array {
-		$history = $this->load( 'history' );
+		if ( !$this->has_login() )
+			exit( 'session' );
+		$history = $this->get_value( 'history' );
 		if ( !is_null( $history ) )
 			return $history;
-		$this->login();
 		$ch = $this->curl_init( self::URL_HISTORY );
 		$xpath = $this->curl_exec( $ch );
 		// table
@@ -269,7 +308,7 @@ abstract class Mycosmos {
 			'cols' => $cols,
 			'rows' => $rows,
 		];
-		$this->save( 'history', $history );
+		$this->set_value( 'history', $history );
 		return $history;
 	}
 }

@@ -1,135 +1,96 @@
 <?php
 
-function failure( string $error = '', ...$args ) {
-	if ( !empty( $args ) )
-		$error = sprintf( $error, ...$args );
-	$page = new page( 'error' );
-	$page->add_msg( $error, 'error' );
-	$page->html();
-}
-
-function redirect( string $url = SITE_URL ) {
-	header( 'location: ' . $url );
-	exit;
-}
-
 class page {
 
 	private $title;
-	private $css = [];
-	private $js = [];
-	private $msg = [];
-	private $body = [];
+	private $action_list;
 
 	public function __construct( string $title = '' ) {
 		$this->title = $title;
-		$this->add_css( 'https://www.w3schools.com/w3css/4/w3.css' );
-		$this->add_css( 'https://www.w3schools.com/lib/w3-theme-lime.css' );
-		$this->add_css( 'https://use.fontawesome.com/releases/v5.0.8/css/all.css' );
-		$this->add_js( 'https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js' );
+		$this->action_list = [];
+		// https://www.w3schools.com/w3css/w3css_downloads.asp
+		$this->add_action( 'head_tag', [ 'page', 'echo_style_tag' ], 'https://www.w3schools.com/w3css/4/w3.css' );
+		$this->add_action( 'head_tag', [ 'page', 'echo_style_tag' ], 'https://www.w3schools.com/lib/w3-theme-lime.css' );
+		$this->add_action( 'head_tag', [ 'page', 'echo_style_tag' ], site_href( 'flex.css' ) );
+		// https://fontawesome.com/
+		$this->add_action( 'head_tag', [ 'page', 'echo_style_tag' ], 'https://use.fontawesome.com/releases/v5.0.8/css/all.css' );
+		// https://jquery.com/download/
+		$this->add_action( 'head_tag', [ 'page', 'echo_script_tag' ], 'https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js' );
+		$this->add_action( 'head_tag', [ 'page', 'echo_script_tag' ], site_href( 'ajax.js' ) );
 	}
 
-	public function add_css( string $css ) {
-		$this->css[] = $css;
-	}
+	// action
 
-	public function add_js( string $js ) {
-		$this->js[] = $js;
-	}
-
-	public static function msg_color( string $type ): string {
-		switch ( $type ) {
-			case 'success':
-				return 'w3-green';
-			case 'info':
-				return 'w3-blue';
-			case 'warning':
-				return 'w3-orange';
-			case 'error':
-				return 'w3-red';
-			default:
-				return 'w3-theme';
-		}
-	}
-
-	public function add_msg( string $html, string $type = '' ) {
-		$this->msg[] = [
-			'html' => $html,
-			'type' => $type,
-		];
-	}
-
-	public function add_body( callable $func, ...$args ) {
-		$this->body[] = [
-			'func' => $func,
+	public function add_action( string $key, callable $fn, ...$args ): void {
+		if ( !array_key_exists( $key, $this->action_list ) )
+			$this->action_list[$key] = [];
+		$action = [
+			'fn' => $fn,
 			'args' => $args,
 		];
+		$this->action_list[$key][] = $action;
 	}
 
-	public function html() {
-		global $mycosmos;
+	function do_action( string $key ): void {
+		if ( !array_key_exists( $key, $this->action_list ) )
+			return;
+		foreach ( $this->action_list[$key] as $action )
+			$action['fn']( ...$action['args'] );
+	}
+
+	public static function echo_style_tag( string $href ): void {
+		echo sprintf( '<link rel="stylesheet" type="text/css" href="%s" />', $href ) . "\n";
+	}
+
+	public static function echo_script_tag( string $src ): void {
+		echo sprintf( '<script src="%s"></script>', $src ) . "\n";
+	}
+
+	public static function echo_button( string $href, string $text, string $icon, array|string|null $class = NULL ): void {
+		if ( is_null( $class ) )
+			$class = [];
+		elseif ( is_string( $class ) )
+			$class = explode( ' ', $class );
+		$class[] = 'w3-button';
+		echo sprintf( '<a href="%s" class="%s">', $href, implode( ' ', $class ) ) . "\n";
+		echo sprintf( '<span class="%s"></span>', $icon ) . "\n";
+		echo sprintf( '<span>%s</span>', $text ) . "\n";
+		echo '</a>' . "\n";
+	}
+
+	// html
+
+	public function html(): void {
 		echo '<html lang="en">' . "\n";
 		echo '<head>' . "\n";
 		echo '<meta charset="UTF-8" />' . "\n";
 		echo '<meta name="viewport" content="width=device-width, initial-scale=1" />' . "\n";
 		echo '<meta name="author" content="constracti" />' . "\n";
 		if ( $this->title !== '' )
-			echo sprintf( '<title>%s :: %s</title>', SITE_NAME, $this->title ) . "\n";
+			echo sprintf( '<title>%s | %s</title>', $this->title, SITE_NAME ) . "\n";
 		else
 			echo sprintf( '<title>%s</title>', SITE_NAME ) . "\n";
 		echo '<link rel="shortcut icon" type="image/png" href="/favicon.png" />' . "\n";
-		foreach ( $this->css as $css )
-			echo sprintf( '<link rel="stylesheet" type="text/css" href="%s" />', $css ) . "\n";
-		foreach ( $this->js as $js )
-			echo sprintf( '<script type="application/javascript" src="%s"></script>', $js ) . "\n";
-?>
-<style rel="stylesheet" type="text/css">
-label, input[type="checkbox"] {
-	cursor: pointer;
-}
-</style>
-<?php
+		$this->do_action( 'head_tag' );
 		echo '</head>' . "\n";
-		echo '<body class="w3-theme-l5">' . "\n";
-		if ( !is_null( $mycosmos ) ) {
-			echo '<div class="w3-bar w3-card w3-theme">' . "\n";
-			$navbar = [
-				[
-					'name' => 'home',
-					'href' => site_href(),
-					'icon' => 'fa-home',
-				],
-				[
-					'name' => 'history',
-					'href' => site_href( 'history.php' ),
-					'icon' => 'fa-history',
-				],
-				[
-					'name' => 'logout',
-					'href' => site_href( 'logout.php' ),
-					'icon' => 'fa-sign-out-alt',
-				],
-			];
-			foreach ( $navbar as $navbaritem ) {
-				echo sprintf( '<a class="w3-bar-item w3-button %s" href="%s">', $navbaritem['name'] === 'logout' ? 'w3-right' : '', $navbaritem['href'] ) . "\n";
-				echo sprintf( '<span class="fas %s"></span>', $navbaritem['icon'] ) . "\n";
-				echo sprintf( '<span class="w3-hide-small">%s</span>', $navbaritem['name'] ) . "\n";
-				echo '</a>' . "\n";
-			}
+		echo '<body class="flex-col w3-theme-l5">' . "\n";
+		if ( $GLOBALS['mycosmos']->has_login() ) {
+			echo '<div class="flex-row flex-justify-between flex-align-center w3-theme">' . "\n";
+			echo '<div class="flex-row">' . "\n";
+			self::echo_button( site_href(), 'home', 'fas fa-fw fa-home' );
+			self::echo_button( site_href( 'history.php' ), 'history', 'fas fa-fw fa-history' );
+			echo '</div>' . "\n";
+			echo '<div class="flex-row">' . "\n";
+			self::echo_button( site_href( 'logout.php' ), 'logout', 'fas fa-fw fa-sign-out-alt' );
+			echo '</div>' . "\n";
 			echo '</div>' . "\n";
 		}
-		echo '<div class="w3-panel w3-content">' . "\n";
-		echo sprintf( '<h1 class="w3-text-theme w3-center" style="margin: 0px;">%s</h1>', $this->title !== '' ? $this->title : SITE_NAME ) . "\n";
+		echo '<div class="root flex-col">' . "\n";
+		echo '<div class="flex-row flex-justify-center">' . "\n";
+		echo sprintf( '<h1 class="leaf w3-text-theme">%s</h1>', $this->title !== '' ? $this->title : SITE_NAME ) . "\n";
 		echo '</div>' . "\n";
-		foreach ( $this->msg as $msg ) {
-			echo '<div class="w3-panel w3-content">' . "\n";
-			echo sprintf( '<div class="w3-container w3-round w3-leftbar %s">', self::msg_color( $msg['type'] ) ) . "\n";
-			echo sprintf( '<p>%s</p>', $msg['html'] ) . "\n";
-			echo '</div>' . "\n";
-			echo '</div>' . "\n";
-		}
-		foreach ( $this->body as $body )
-			$body['func'](...$body['args']);
+		$this->do_action( 'body_tag' );
+		echo '</div>' . "\n";
 		echo '</body>' . "\n";
 		echo '</html>' . "\n";
 		exit;
