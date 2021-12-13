@@ -284,7 +284,7 @@ abstract class Mycosmos {
 			}
 			$rows[] = $row;
 		}
-		usort( $rows, function( $a, $b ) {
+		usort( $rows, function( $a, $b ): int {
 			return $b[self::COL_ID] <=> $a[self::COL_ID];
 		} );
 		$navs = [];
