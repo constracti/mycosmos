@@ -38,9 +38,9 @@ function curl_safe_getinfo( CurlHandle $ch, int|null $opt = NULL ) {
 abstract class Mycosmos {
 
 	const URL_HOME    = 'https://mycosmos.gr/';
-	const URL_COMPOSE = 'https://www.mycosmos.gr/?_action=plugin.websms_compose';
-	const URL_SEND    = 'https://www.mycosmos.gr/?_action=plugin.websms_compose_send';
-	const URL_HISTORY = 'https://www.mycosmos.gr/?_action=plugin.websms_sent';
+	const URL_COMPOSE = 'https://mycosmos.gr/?_task=websms&_action=plugin.websms_compose';
+	const URL_SEND    = 'https://mycosmos.gr/?_task=websms&_action=plugin.websms_compose_send';
+	const URL_HISTORY = 'https://mycosmos.gr/?_task=websms&_action=plugin.websms_sent';
 
 	const COL_ID        = 0;
 	const COL_RECIPIENT = 1;
@@ -139,7 +139,7 @@ abstract class Mycosmos {
 	}
 
 	private static function xpath_has_login( DOMXPath $xpath ): bool {
-		return $xpath->query( '//*[@id="login-area"]' )->length !== 0;
+		return $xpath->query( '//*[@id="taskmenu"]' )->length !== 0;
 	}
 
 	private static function xpath_get_token( DOMXPath $xpath ): string|null {
