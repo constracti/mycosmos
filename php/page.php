@@ -70,7 +70,7 @@ class page {
 			echo sprintf( '<title>%s | %s</title>', $this->title, SITE_NAME ) . "\n";
 		else
 			echo sprintf( '<title>%s</title>', SITE_NAME ) . "\n";
-		echo '<link rel="shortcut icon" type="image/png" href="/favicon.png" />' . "\n";
+		echo '<link rel="icon" type="image/png" href="/favicon.png" />' . "\n";
 		$this->do_action( 'head_tag' );
 		echo '</head>' . "\n";
 		echo '<body class="flex-col w3-theme-l5">' . "\n";
