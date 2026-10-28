@@ -10,7 +10,6 @@ function curl_safe_init( string|null $url = NULL ): CurlHandle {
 function curl_safe_setopt( CurlHandle $ch, int $option, $value ): void {
 	if ( curl_setopt( $ch, $option, $value ) === FALSE ) {
 		$errno = curl_errno( $ch );
-		curl_close( $ch );
 		exit( 'curl_setopt ' . $option . ': ' . curl_strerror( $errno ) );
 	}
 }
@@ -19,7 +18,6 @@ function curl_safe_exec( CurlHandle $ch ) {
 	$ret = curl_exec( $ch );
 	if ( $ret === FALSE ) {
 		$errno = curl_errno( $ch );
-		curl_close( $ch );
 		exit( 'curl_exec: ' . curl_strerror( $errno ) );
 	}
 	return $ret;
@@ -29,7 +27,6 @@ function curl_safe_getinfo( CurlHandle $ch, int|null $opt = NULL ) {
 	$ret = curl_getinfo( $ch, $opt );
 	if ( ( is_null( $opt ) || $opt === 0 ) && $ret === FALSE ) {
 		$errno = curl_errno( $ch );
-		curl_close( $ch );
 		exit( 'curl_getinfo ' . $opt . ': ' . curl_strerror( $errno ) );
 	}
 	return $ret;
@@ -114,12 +111,10 @@ abstract class Mycosmos {
 		$code = curl_safe_getinfo( $ch, CURLINFO_HTTP_CODE );
 		if ( $code === 302 ) {
 			$url = curl_safe_getinfo( $ch, CURLINFO_REDIRECT_URL );
-			curl_close( $ch );
 			$this->update_cookies( $result );
 			$ch = $this->curl_init( $url );
 			$result = curl_safe_exec( $ch );
 		}
-		curl_close( $ch );
 		$pos = mb_strpos( $result, '<!DOCTYPE html>' );
 		$header = mb_substr( $result, 0, $pos );
 		$this->update_cookies( $header );
